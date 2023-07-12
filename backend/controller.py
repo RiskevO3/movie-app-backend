@@ -44,7 +44,7 @@ def get_movie_detail(movie_id):
     url=f"{app.config['MOVIE_DETAIL_URL']}{movie_id}"
     res = requests.get(url)
     if res.status_code != 200:
-        return {'success': False}, 400
+        return {'success': False}, 200
     html = res.text
     class_name='col-xs-8 col-sm-11 col-md-11'
     movie_details = {}
@@ -66,7 +66,7 @@ def get_movie_detail(movie_id):
         movie_details['director'] = desc_cast_dir[2]
         movie_details['image'] = image_url
         return {'success':True,'data':movie_details},200
-    return {'success': False}, 400
+    return {'success': False}, 200
 
 def extract_movie(html):
     data = []
@@ -90,14 +90,14 @@ def movie_handler(url):
         result = extract_movie(res.text)
         if result:
             return {'success':True,'data':result},200
-    return {'success': False}, 400
+    return {'success': False}, 200
 
 
 def check_movie_video(movie_id):
     res = requests.get(f'https://web3.21cineplex.com/movie-trailer/{movie_id}.mp4')
     if res.status_code == 200:
         return {'success':True},200
-    return {'success': False}, 400
+    return {'success': False}, 200
 
 @app.route('/<path:url_path>')
 def proxy_movie_trailer(url_path):
