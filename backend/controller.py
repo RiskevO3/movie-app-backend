@@ -68,7 +68,28 @@ def generate_random_token():
                 return token
     except:
         return False
-
+    
+def register_handler(data):
+    try:
+        if not data.get('username') and data.get('password'):
+            return {'success':False,'message':'harap isi seluruh field yang dibutuhkan!'},200
+        if not len(data['username']) > 3 and len(data['password']) > 3:
+            return {'success':False,'message':'username dan password minimal 3 karakter!'},200
+        user = User.query.filter_by(username=data['username']).first()
+        if not user:
+            user = User(
+                username=data['username'],
+                password=data['password'],
+                token=generate_random_token()
+            )
+            db.session.add(user)
+            db.session.commit()
+            return {'success':True,'data':{'authToken':encode_token({'token':user.token}),'username':user.username}},200
+        return {'success':False,'message':'username sudah terdaftar!'},200
+    except Exception as e:
+        print(e)
+        return {'success':False,'message':'Something went wrong!'},200
+    
 def login_handler(data):
     print(data)
     if not data.get('username') and data.get('password'):

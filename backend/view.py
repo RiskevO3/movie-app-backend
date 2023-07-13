@@ -9,7 +9,8 @@ from backend.controller import\
     logout_handler,\
     insert_wishlist_handler,\
     delete_wishlist_handler,\
-    get_wishlist_handler
+    get_wishlist_handler,\
+    register_handler
 
 from flask import request
 import json
@@ -22,7 +23,8 @@ def login():
 
 @app.route('/register',methods=['POST'])
 def register():
-    pass
+    data = json.loads(request.data.decode('UTF-8'))
+    return register_handler(data=data)
 
 @app.route('/logout')
 @token_required
