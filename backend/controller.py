@@ -74,7 +74,7 @@ def register_handler(data):
         if not data.get('username') and data.get('password'):
             return {'success':False,'message':'harap isi seluruh field yang dibutuhkan!'},200
         if not len(data['username']) > 3 and len(data['password']) > 3:
-            return {'success':False,'message':'username dan password minimal 3 karakter!'},200
+            return {'success':False,'message':'username dan password minimal 3 karakter!!'},200
         user = User.query.filter_by(username=data['username']).first()
         if not user:
             user = User(
