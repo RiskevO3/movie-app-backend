@@ -1,3 +1,3 @@
-from backend import app, socketio
+from backend import app
 if __name__ == '__main__':
-    socketio.run(app,port='5001',host='0.0.0.0',debug=True)
+    app.run(port='5001',host='0.0.0.0',debug=True)

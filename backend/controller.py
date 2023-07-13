@@ -1,7 +1,91 @@
+from functools import wraps
 from backend import app
+from backend.models import User,SavedMovie,db
+from flask import request
+import jwt
 import requests
 import re
+import uuid
 
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        print(request.headers)
+        if "Authorization" in request.headers:
+            print(request.headers["Authorization"])
+            token = request.headers["Authorization"].split(" ")[1]
+        if not token:
+            return {
+                "success": False,
+                "message": "Unauthorized"
+            }, 200
+        try:
+            data=decode_token(token)
+            if not data:
+                return {
+                "success": False,
+                "message": "Unauthorized"
+            }, 200
+            print(data['token'])
+            current_user=User.query.filter_by(token=data['token']).first()
+            if not current_user:
+                return {
+                "success": False,
+                "message": "Unauthorized"
+            }, 200
+        except Exception as e:
+            print(e)
+            return {
+                "message": "Something went wrong",
+                "data": None,
+                "error": str(e)
+            }, 500
+        return f(current_user, *args, **kwargs)
+    return decorated
+
+def encode_token(params):
+    try:
+        return jwt.encode(params,app.config['SECRET_KEY'],algorithm='HS256')
+    except Exception as e:
+        print(e)
+        return False
+
+def decode_token(token):
+    try:
+        return jwt.decode(token,app.config['SECRET_KEY'],algorithms=['HS256'])
+    except Exception as e:
+        print(e)
+        return False
+
+def generate_random_token():
+    try:
+        while True:
+            token = str(uuid.uuid4())
+            user = User.query.filter_by(token=token).first()
+            if not user:
+                return token
+    except:
+        return False
+
+def login_handler(data):
+    print(data)
+    if not data.get('username') and data.get('password'):
+        return {'success':False,'message':'harap isi seluruh field yang dibutuhkan!'},200
+    user = User.query.filter_by(username=data['username']).first()
+    if user and user.check_password_correction(data['password']):
+        token = generate_random_token()
+        if token:
+            user.token = token
+            db.session.commit()
+            return {'success':True,'data':{'authToken':encode_token({'token':user.token}),'username':user.username}},200
+    return {'success':False},200
+    
+def logout_handler(current_user):
+    current_user.token = generate_random_token()
+    db.session.commit()
+    return {'success':True},200
 
 def get_thumbnail(html):
     pattern = r'<div class="col-md-3 col-sm-6 col-xs-6">\s*<img src="(.*?)" class="img-responsive pull-left gap-left".*?>\s*</div>'
@@ -40,7 +124,7 @@ def get_duration_and_trailer_from_html(html):
     return False
 
 
-def get_movie_detail(movie_id):
+def get_movie_detail(movie_id,current_user):
     url=f"{app.config['MOVIE_DETAIL_URL']}{movie_id}"
     res = requests.get(url)
     if res.status_code != 200:
@@ -65,9 +149,17 @@ def get_movie_detail(movie_id):
         movie_details['cast'] = desc_cast_dir[1]
         movie_details['director'] = desc_cast_dir[2]
         movie_details['image'] = image_url
+        movie_details['saved'] = True if movie_details['id'] in [movie.movie_id for movie in current_user.saved_movies] else False
         return {'success':True,'data':movie_details},200
     return {'success': False}, 200
 
+def get_wishlist_handler(current_user):
+    try:
+        movies = [movie.to_json() for movie in current_user.saved_movies]
+        return {'success':True,'data':movies},200
+    except:
+        return {'success':False},200
+    
 def extract_movie(html):
     data = []
     pattern = r'<div class="grid_movie">\s*<a\s*href="([^"]*)">\s*<img\s*id=\'([^"]*)\'\s*src="([^"]*)".*?<div class="title">([^<]*)<\/div>'
@@ -84,12 +176,14 @@ def extract_movie(html):
         return data
     return False
 
-def movie_handler(url):
+def movie_handler(url,current_user):
     res = requests.get(url)
     if res.status_code == 200:
         result = extract_movie(res.text)
         if result:
-            return {'success':True,'data':result},200
+            movie_wishlist = [movie.to_short_json() for movie in current_user.saved_movies]
+            print(movie_wishlist)
+            return {'success':True,'data':[movie for movie in result if movie not in movie_wishlist]},200
     return {'success': False}, 200
 
 
@@ -99,11 +193,42 @@ def check_movie_video(movie_id):
         return {'success':True},200
     return {'success': False}, 200
 
-@app.route('/<path:url_path>')
-def proxy_movie_trailer(url_path):
-    original_url = "https://web3.21cineplex.com/" + url_path
-    response = requests.get(original_url)
-    headers = response.headers
-    content_type = headers.get('content-type')
-    # Mengembalikan respons dengan konten dan tipe konten yang sama
-    return response.content, 200, {'Content-Type': content_type}
+def check_authentication(data):
+    if not data.get('authToken'):
+        return {'success':False},200
+    token = decode_token(data['authToken'])
+    if token:
+        user = User.query.filter_by(token=token['token']).first()
+        if user:
+            return {'success':True,'username':user.username},200
+    return {'success':False},200
+    
+
+def insert_wishlist_handler(current_user,movie_id):
+    movie = SavedMovie.query.filter_by(movie_id=movie_id,user_id=current_user.id).first()
+    if not movie:
+        movie_detail = get_movie_detail(movie_id=movie_id,current_user=current_user)
+        movie = SavedMovie(
+            movie_id=movie_detail[0]['data']['id'],
+            movie_title=movie_detail[0]['data']['title'],
+            movie_poster=movie_detail[0]['data']['image'],
+            movie_duration=movie_detail[0]['data']['duration'],
+            movie_genre=movie_detail[0]['data']['genre'],
+            movie_director=movie_detail[0]['data']['director'],
+            movie_cast=movie_detail[0]['data']['cast'],
+            movie_synopsis=movie_detail[0]['data']['description'],
+            movie_trailer=movie_detail[0]['data']['trailer'],
+            user_id=current_user.id
+        )
+        db.session.add(movie)
+        db.session.commit()
+        return {'success':True},200
+    return {'success':False},200
+
+def delete_wishlist_handler(current_user,movie_id):
+    movie = SavedMovie.query.filter_by(movie_id=movie_id,user_id=current_user.id).first()
+    if movie:
+        db.session.delete(movie)
+        db.session.commit()
+        return {'success':True},200
+    return {'success':False},200

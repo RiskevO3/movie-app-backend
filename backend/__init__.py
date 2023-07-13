@@ -1,11 +1,9 @@
 from flask import Flask
-from flask_socketio import SocketIO
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from dotenv import load_dotenv
 import os
-import jwt
 
 load_dotenv()
 app = Flask(__name__)
@@ -18,6 +16,5 @@ app.config['COMING_SOON_URL'] = os.environ.get('COMING_SOON_URL')
 app.config['MOVIE_DETAIL_URL'] = os.environ.get('MOVIE_DETAIL_URL')
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
-socketio = SocketIO(app,cors_allowed_origins='*',logger=True,engineio_logger=True)
 
 from backend import view
