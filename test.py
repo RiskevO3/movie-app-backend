@@ -1,5 +1,6 @@
 # # from backend.controller import app,now_showing_handler
 
+print('done')
 
 
 # # now_showing_handler()
@@ -93,18 +94,18 @@
 #     else:
 #         return 'semua umur'
 
-from backend.controller import db,User,SavedMovie,app,generate_random_token,encode_token
+# from backend.controller import db,User,SavedMovie,app,generate_random_token,encode_token
 
-with app.app_context():
-    db.drop_all()
-    db.create_all()
-    user = User(
-        username='admin',
-        password='admin',
-        token=generate_random_token(),
-        balance = 10000000
-    )
-    print(encode_token({'token':user.token}))
-    db.session.add(user)
-    db.session.commit()
-    print(User.query.all())
+# with app.app_context():
+#     db.drop_all()
+#     db.create_all()
+#     user = User(
+#         username='admin',
+#         password='admin',
+#         token=generate_random_token(),
+#         balance = 10000000
+#     )
+#     print(encode_token({'token':user.token}))
+#     db.session.add(user)
+#     db.session.commit()
+#     print(User.query.all())
