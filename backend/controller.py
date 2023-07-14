@@ -1,6 +1,6 @@
 from functools import wraps
 from backend import app
-from backend.models import User,SavedMovie,db
+from backend.models import User,SavedMovie,MovieSeat,MovieTicket,db
 from flask import request
 import jwt
 import requests
@@ -12,7 +12,6 @@ def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
-        print(request.headers)
         if "Authorization" in request.headers:
             print(request.headers["Authorization"])
             token = request.headers["Authorization"].split(" ")[1]
@@ -84,7 +83,7 @@ def register_handler(data):
             )
             db.session.add(user)
             db.session.commit()
-            return {'success':True,'data':{'authToken':encode_token({'token':user.token}),'username':user.username}},200
+            return {'success':True,'data':{'authToken':encode_token({'token':user.token}),'username':user.username,'balance':user.balance}},200
         return {'success':False,'message':'username sudah terdaftar!'},200
     except Exception as e:
         print(e)
@@ -100,13 +99,27 @@ def login_handler(data):
         if token:
             user.token = token
             db.session.commit()
-            return {'success':True,'data':{'authToken':encode_token({'token':user.token}),'username':user.username}},200
+            return {'success':True,'data':{'authToken':encode_token({'token':user.token}),'username':user.username,'balance':user.balance}},200
     return {'success':False},200
     
 def logout_handler(current_user):
     current_user.token = generate_random_token()
     db.session.commit()
     return {'success':True},200
+
+def find_detail_age_minimum(html):
+    pattern = r'<img src="images/([^"]+)" width="50" height="50"/>'
+    match = re.search(pattern, html)
+    if match:
+        filename = match.group(1)
+        number_match = re.search(r'(\d+)', filename)
+        if number_match:
+            number = number_match.group(1)
+            return number + '+'
+        else:
+            return 'semua umur'
+    else:
+        return 'semua umur'
 
 def get_thumbnail(html):
     pattern = r'<div class="col-md-3 col-sm-6 col-xs-6">\s*<img src="(.*?)" class="img-responsive pull-left gap-left".*?>\s*</div>'
@@ -116,6 +129,20 @@ def get_thumbnail(html):
         image_url = re.sub(r'https://web3.21cineplex.com', app.config['WEB_URL'], image_url)
         return image_url
     return False
+
+def get_movie_price(movie_id):
+    res = requests.get(f'{app.config["MOVIE_TICKET_URL"]}{movie_id}')
+    if res.status_code != 200:
+        return None
+    html = res.text
+    pattern = r'<span class="p_price">([^<]+)</span>'
+    match = re.search(pattern, html)
+    if match:
+        price_str = match.group(1)
+        price_str = re.sub(r'[^\d]+', '', price_str)
+        return int(price_str)
+    else:
+        return None
 
 def get_desc_cast_dir(html):
     img_pattern = r'<img src="(.*?)" class="img-responsive pull-left gap-left".*?>'
@@ -162,14 +189,17 @@ def get_movie_detail(movie_id,current_user):
         duration_trailer = get_duration_and_trailer_from_html(html)
         desc_cast_dir = get_desc_cast_dir(html)
         image_url = get_thumbnail(html)
-        if not duration_trailer or not desc_cast_dir or not image_url:
+        age_minimum = find_detail_age_minimum(html)
+        if not duration_trailer or not desc_cast_dir or not image_url or not age_minimum:
             return False
+        movie_details['age_minimum'] = age_minimum
         movie_details['duration'] = duration_trailer[0]
         movie_details['trailer'] = duration_trailer[1]
         movie_details['description'] = desc_cast_dir[0]
         movie_details['cast'] = desc_cast_dir[1]
         movie_details['director'] = desc_cast_dir[2]
         movie_details['image'] = image_url
+        movie_details['price'] = get_movie_price(movie_id)
         movie_details['saved'] = True if movie_details['id'] in [movie.movie_id for movie in current_user.saved_movies] else False
         return {'success':True,'data':movie_details},200
     return {'success': False}, 200
@@ -197,11 +227,36 @@ def extract_movie(html):
         return data
     return False
 
+def insert_movie_seat(movie_id):
+    try:
+        movie_seat = MovieSeat.query.filter_by(movie_id=movie_id).first()
+        if not movie_seat:
+            movie_seat = MovieSeat(
+                movie_id=movie_id,
+                price=get_movie_price(movie_id)
+            )
+            db.session.add(movie_seat)
+            for ticket in range(1,65):
+                ticket = MovieTicket(
+                    ticket_number=ticket,
+                )
+                movie_seat.ticket.append(ticket)
+                db.session.add(ticket)
+            db.session.commit()
+        return True
+    except:
+        return False
+
 def movie_handler(url,current_user):
     res = requests.get(url)
     if res.status_code == 200:
         result = extract_movie(res.text)
         if result:
+            if url == app.config['NOW_SHOWING_URL']:
+                for movie in result:
+                    insert_movie = insert_movie_seat(movie['id'])
+                    if not insert_movie:
+                        return {'success': False}, 200
             movie_wishlist = [movie.to_short_json() for movie in current_user.saved_movies]
             print(movie_wishlist)
             return {'success':True,'data':[movie for movie in result if movie not in movie_wishlist]},200
@@ -221,7 +276,7 @@ def check_authentication(data):
     if token:
         user = User.query.filter_by(token=token['token']).first()
         if user:
-            return {'success':True,'username':user.username},200
+            return {'success':True,'username':user.username,'balance':user.balance},200
     return {'success':False},200
     
 
@@ -252,4 +307,42 @@ def delete_wishlist_handler(current_user,movie_id):
         db.session.delete(movie)
         db.session.commit()
         return {'success':True},200
+    return {'success':False},200
+
+
+def topup_handler(current_user,data):
+    if not data.get('amount'):
+        return {'success':False},200
+    current_user.balance += int(data['amount'])
+    db.session.commit()
+    return {'success':True,'balance':current_user.balance},200
+
+def withdraw_balance_handler(current_user,data):
+    print('aaaa')
+    if current_user.balance < 500000:
+        print(1)
+        return {'success':False,'message':'Saldo tidak lebih dari 500000'},200
+    if not data.get('amount'):
+        print(2)
+        return {'success':False},200
+    if current_user.balance < int(data['amount']):
+        print(3)
+        return {'success':False,'message':'Saldo tidak cukup!'},200
+    current_user.balance -= int(data['amount'])
+    if current_user.balance < 500000:
+        print(4)
+        return {'success':False,'message':'Saldo tidak lebih dari 500000'},200
+    db.session.commit()
+    return {'success':True,'balance':current_user.balance},200
+
+def get_seat_list_handler(movie_id,current_user):
+    movie_seat = MovieSeat.query.filter_by(movie_id=movie_id).first()
+    if movie_seat:
+        movie_title = get_movie_detail(current_user=current_user,movie_id=movie_id)[0]['data']['title']
+        print(movie_title)
+        return {'success':True,
+                'data':[ticket.to_json() for ticket in movie_seat.ticket],
+                'movie_title':movie_title,
+                'price':movie_seat.price,
+                },200
     return {'success':False},200

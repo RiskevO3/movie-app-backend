@@ -10,7 +10,10 @@ from backend.controller import\
     insert_wishlist_handler,\
     delete_wishlist_handler,\
     get_wishlist_handler,\
-    register_handler
+    register_handler,\
+    topup_handler,\
+    withdraw_balance_handler,\
+    get_seat_list_handler
 
 from flask import request
 import json
@@ -41,6 +44,11 @@ def now_showing(current_user):
 def coming_soon(current_user):
     return movie_handler(url=app.config['COMING_SOON_URL'],current_user=current_user)
 
+@app.route('/auth',methods=['POST'])
+def auth():
+    data = json.loads(request.data.decode('UTF-8'))
+    return check_authentication(data=data)
+
 @app.route('/moviedetail/<movie_id>')
 @token_required
 def movie_detail(current_user,movie_id):
@@ -70,10 +78,23 @@ def delete_wishlist(current_user):
     movie_id = json.loads(request.data.decode('UTF-8'))['id']
     return delete_wishlist_handler(current_user=current_user,movie_id=movie_id)
 
-@app.route('/auth',methods=['POST'])
-def auth():
+@app.route('/seatlist/<movie_id>')
+@token_required
+def seat_list(current_user,movie_id):
+    return get_seat_list_handler(current_user=current_user,movie_id=movie_id)
+
+@app.route('/topup',methods=['POST'])
+@token_required
+def topup(current_user):
     data = json.loads(request.data.decode('UTF-8'))
-    return check_authentication(data=data)
+    return topup_handler(current_user=current_user,data=data)
+
+@app.route('/withdraw',methods=['POST'])
+@token_required
+def withdraw(current_user):
+    data = json.loads(request.data.decode('UTF-8'))
+    print(data)
+    return withdraw_balance_handler(current_user=current_user,data=data)
 
 @app.route('/<path:url_path>')
 def proxy_movie_trailer(url_path):
