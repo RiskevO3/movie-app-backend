@@ -47,7 +47,7 @@ class MovieTicket(db.Model):
 
 class SavedMovie(db.Model):
     id = db.Column(db.Integer,primary_key=True)
-    movie_id = db.Column(db.Integer,nullable=False)
+    movie_id = db.Column(db.String(100),nullable=False)
     movie_title = db.Column(db.String(100),nullable=False)
     movie_poster = db.Column(db.String(100),nullable=False)
     movie_duration = db.Column(db.String(100),nullable=False)
