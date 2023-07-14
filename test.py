@@ -107,3 +107,4 @@ with app.app_context():
     print(encode_token({'token':user.token}))
     db.session.add(user)
     db.session.commit()
+    print(User.query.all())
