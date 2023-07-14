@@ -394,4 +394,4 @@ def reffund_ticket_handler(current_user,data):
         movie_ticket.user_id = None
         current_user.balance += movie_ticket.movie_seat.price
         db.session.commit()
-        return {'success':True},200
+        return {'success':True,'balance':current_user.balance},200
