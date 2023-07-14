@@ -16,6 +16,7 @@ app.config['COMING_SOON_URL'] = os.environ.get('COMING_SOON_URL')
 app.config['MOVIE_DETAIL_URL'] = os.environ.get('MOVIE_DETAIL_URL')
 app.config['MOVIE_TICKET_URL'] = os.environ.get('MOVIE_TICKET_URL')
 app.config['MOVIE_MEDIA_URL'] =  os.environ.get('MOVIE_MEDIA_URL')
+app.config['DEBUG'] = os.environ.get('DEBUG')
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 
