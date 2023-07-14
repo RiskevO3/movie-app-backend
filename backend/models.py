@@ -36,6 +36,14 @@ class MovieTicket(db.Model):
             'is_sold':True if self.user_id else False,
             'is_book':True if self.user_id else False
         }
+    
+    def full_json(self):
+        return {
+            'ticket_id':self.id,
+            'seat_number':self.ticket_number,
+            'movie_seat_id':self.movie_seat_id,
+        }
+
 
 class SavedMovie(db.Model):
     id = db.Column(db.Integer,primary_key=True)

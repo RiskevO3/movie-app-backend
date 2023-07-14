@@ -13,7 +13,10 @@ from backend.controller import\
     register_handler,\
     topup_handler,\
     withdraw_balance_handler,\
-    get_seat_list_handler
+    get_seat_list_handler,\
+    book_ticket_handler,\
+    get_booked_ticket_handler,\
+    reffund_ticket_handler
 
 from flask import request
 import json
@@ -54,6 +57,17 @@ def auth():
 def movie_detail(current_user,movie_id):
     return get_movie_detail(movie_id=movie_id,current_user=current_user)
 
+@app.route('/bookedticket')
+@token_required
+def booked_ticket(current_user):
+    return get_booked_ticket_handler(current_user=current_user)
+
+@app.route('/reffundticket',methods=['POST'])
+@token_required
+def reffund_ticket(current_user):
+    data = json.loads(request.data.decode('UTF-8'))
+    return reffund_ticket_handler(current_user=current_user,data=data)
+
 @app.route('/wishlist')
 @token_required
 def wishlist(current_user):
@@ -82,6 +96,12 @@ def delete_wishlist(current_user):
 @token_required
 def seat_list(current_user,movie_id):
     return get_seat_list_handler(current_user=current_user,movie_id=movie_id)
+
+@app.route('/bookticket',methods=['POST'])
+@token_required
+def book_ticket(current_user):
+    data = json.loads(request.data.decode('UTF-8'))
+    return book_ticket_handler(current_user=current_user,data=data)
 
 @app.route('/topup',methods=['POST'])
 @token_required

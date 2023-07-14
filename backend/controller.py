@@ -331,14 +331,15 @@ def withdraw_balance_handler(current_user,data):
     current_user.balance -= int(data['amount'])
     if current_user.balance < 500000:
         print(4)
-        return {'success':False,'message':'Saldo tidak lebih dari 500000'},200
+        return {'success':False,'message':'Saldo tidak lebih dari 500000 setelah withdraw'},200
     db.session.commit()
     return {'success':True,'balance':current_user.balance},200
 
 def get_seat_list_handler(movie_id,current_user):
     movie_seat = MovieSeat.query.filter_by(movie_id=movie_id).first()
     if movie_seat:
-        movie_title = get_movie_detail(current_user=current_user,movie_id=movie_id)[0]['data']['title']
+        movie = get_movie_detail(current_user=current_user,movie_id=movie_id)[0]['data']
+        movie_title = movie['title']
         print(movie_title)
         return {'success':True,
                 'data':[ticket.to_json() for ticket in movie_seat.ticket],
@@ -346,3 +347,51 @@ def get_seat_list_handler(movie_id,current_user):
                 'price':movie_seat.price,
                 },200
     return {'success':False},200
+
+def book_ticket_handler(current_user,data):
+    try:
+        if not data.get('list_seat') or not data.get('movie_id'):
+            return {'success':False},200
+        if len(data['list_seat']) > 6:
+            return {'success':False,'message':'Maksimal 6 tiket!'},200
+        movie_seat = MovieSeat.query.filter_by(movie_id=data['movie_id']).first()
+        if movie_seat.price > current_user.balance:
+            return {'success':False,'message':'Saldo tidak cukup!'},200
+        current_user.balance -= movie_seat.price * len(data['list_seat'])
+        for ticket_number in data['list_seat']:
+            movie_ticket = MovieTicket.query.filter_by(movie_seat_id=movie_seat.id, ticket_number=ticket_number).first()
+
+            print(movie_ticket)
+            if not movie_ticket or movie_ticket.user_id:
+                return {'success':False,'message':'Tiket sudah dibeli!'},200
+            movie_ticket.user_id = current_user.id
+            current_user.movie_ticket.append(movie_ticket)
+        db.session.commit()
+        return {'success':True,'balance':current_user.balance},200
+    except Exception as e:
+        print(e)
+        return {'success':False,'message':'error mak'},200
+    
+def get_booked_ticket_handler(current_user):
+        tickets = [ticket.full_json() for ticket in current_user.movie_ticket]
+        res_tickets = []
+        for ticket in tickets:
+            movie_seat = MovieSeat.query.filter_by(id=ticket['movie_seat_id']).first()
+            ticket['price'] = movie_seat.price
+            movie_detail = get_movie_detail(current_user=current_user,movie_id=movie_seat.movie_id)[0]['data']
+            ticket['image'] = movie_detail['image']
+            ticket['title'] = movie_detail['title']
+            res_tickets.append(ticket)
+        return {'success':True,'data':tickets},200
+
+def reffund_ticket_handler(current_user,data):
+    if not data.get('ticket_id'):
+        return {'success':False},200
+    movie_ticket = MovieTicket.query.filter_by(id=data['ticket_id']).first()
+    if movie_ticket:
+        if movie_ticket.user_id != current_user.id:
+            return {'success':False,'message':'Tiket tidak ditemukan!'},200
+        movie_ticket.user_id = None
+        current_user.balance += movie_ticket.movie_seat.price
+        db.session.commit()
+        return {'success':True},200

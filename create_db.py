@@ -6,7 +6,8 @@ with app.app_context():
     user = User(
         username='admin',
         password='admin',
-        token=generate_random_token()
+        token=generate_random_token(),
+        balance = 10000000
     )
     print(encode_token({'token':user.token}))
     db.session.add(user)
