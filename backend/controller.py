@@ -382,7 +382,7 @@ def get_booked_ticket_handler(current_user):
             ticket['image'] = movie_detail['image']
             ticket['title'] = movie_detail['title']
             res_tickets.append(ticket)
-        return {'success':True,'data':tickets},200
+        return {'success':True,'data':res_tickets},200
 
 def reffund_ticket_handler(current_user,data):
     if not data.get('ticket_id'):
