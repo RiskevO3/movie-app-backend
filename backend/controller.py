@@ -340,9 +340,10 @@ def get_seat_list_handler(movie_id,current_user):
     if movie_seat:
         movie = get_movie_detail(current_user=current_user,movie_id=movie_id)[0]['data']
         movie_title = movie['title']
+        tickets = [ticket.to_json() for ticket in movie_seat.ticket]
         print(movie_title)
         return {'success':True,
-                'data':[ticket.to_json() for ticket in movie_seat.ticket],
+                'data':sorted(tickets, key=lambda x: x['seat_number']),
                 'movie_title':movie_title,
                 'price':movie_seat.price,
                 },200
